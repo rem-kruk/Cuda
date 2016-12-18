@@ -19,11 +19,19 @@ using namespace std;
 
 int main(int argc, char** argv)
 {
-	VideoCapture camera(0);
+/*	VideoCapture camera(0);
 	Mat frame;
 	if (!camera.isOpened())
-		return -1;
+	*/	//return -1;
 
+	IplImage* img = cvLoadImage("lena.jpg", 1);
+	IplImage* dst = cvCreateImage(cvGetSize(img), IPL_DEPTH_8U, 3);
+	double a[9] = { 1.0, 2.0, 1.0,
+		0.0, 0.0, 0.0,
+		-1.0, -2.0, -1.0};
+	CvMat k;
+	cvInitMatHeader(&k, 3, 3, CV_64FC1, a);
 
-	return 0;
+	cvFilter2D(img, dst, &k, cvPoint(-1, -1));
+	cvSaveImage("filtered.jpg", dst);
 }
