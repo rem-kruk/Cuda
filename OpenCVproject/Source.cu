@@ -11,13 +11,14 @@
 #include <opencv2/core/core.hpp>
 #include <stdlib.h>
 #include <stddef.h>
+#include<ctime>
 
 using namespace cv;
 using namespace std;
 #include <string>
 
 #ifndef WINDOW_SIZE
-#define WINDOW_SIZE (3)
+#define WINDOW_SIZE (5)
 #endif
 
 #define TILE_SIZE 16
@@ -66,11 +67,12 @@ unsigned char* createImageBuffer(unsigned int bytes, unsigned char **devicePtr)
 
 int main(int argc, char** argv)
 {
-/*	VideoCapture camera(0);
+	VideoCapture camera(0);
 	Mat frame;
 	if (!camera.isOpened())
-	*/	//return -1;
+		return -1;
 
+	camera >> frame;
 	//IplImage* img = cvLoadImage("lena.jpg", 1);
 	//IplImage* dst = cvCreateImage(cvGetSize(img), IPL_DEPTH_8U, 3);
 	//double a[9] = { 1.0, 2.0, 1.0,
@@ -84,9 +86,10 @@ int main(int argc, char** argv)
 
 	//namedWindow("Before", CV_WINDOW_AUTOSIZE);
 
-	Mat src = imread("lena.jpg", 1);
+	//Mat src = imread("lena.jpg", 1);
 
 	Mat dst;
+
 
 	//imshow("Before", src);
 
@@ -95,24 +98,40 @@ int main(int argc, char** argv)
 	//imshow("Median filter", dst);
 
 
-	int width = src.size().width;
-	int height = src.size().height;
+	int width = frame.size().width;
+	int height = frame.size().height;
 
 	unsigned char *sourceDataDevice, *filteredDataDevice;
-	Mat source(src.size(), CV_8U, createImageBuffer(width * height, &sourceDataDevice));
-	Mat filtered(src.size(), CV_8U, createImageBuffer(width * height, &filteredDataDevice));
-
-	cvtColor(src, source, CV_BGR2GRAY);
+	Mat source(frame.size(), CV_8U, createImageBuffer(width * height, &sourceDataDevice));
+	Mat filtered(frame.size(), CV_8U, createImageBuffer(width * height, &filteredDataDevice));
 
 	dim3 dimBlock(TILE_SIZE, TILE_SIZE);
 	dim3 dimGrid((int)ceil((float)width / (float)TILE_SIZE),
 		(int)ceil((float)height / (float)TILE_SIZE));
 
-	medianFilterKernel << <dimGrid, dimBlock >> > (sourceDataDevice, filteredDataDevice, width, height);
-	
-	cudaDeviceSynchronize();
+	while (1)
+	{
+		camera >> frame;
+		cvtColor(frame, source, CV_BGR2GRAY);
+		clock_t start = clock();
+		medianBlur(source, dst, 1);
+		clock_t end = clock();
+		double time = double(end - start) / ((double)CLOCKS_PER_SEC / 1000);
+		cout << "Czas filtracji na CPU: " << time << "ms\n";
 
-	imshow("source", source);
-	imshow("filtered", filtered);
-	waitKey();
+		start = clock();
+
+		medianFilterKernel << <dimGrid, dimBlock >> > (sourceDataDevice, filteredDataDevice, width, height);
+		//cudaThreadSynchronize();
+		cudaDeviceSynchronize();
+
+		end = clock();
+		time = double(end - start) / ((double)CLOCKS_PER_SEC / 1000);
+		cout << "Czas filtracji na GPU: " << time << "ms\n";
+
+		imshow("source", source);
+		imshow("filtered", filtered);
+		imshow("filtered with opencv", dst);
+		if (cv::waitKey(1) == 27) break;
+	}
 }
